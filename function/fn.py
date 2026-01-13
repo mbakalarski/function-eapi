@@ -46,20 +46,45 @@ class FunctionRunner(grpcv1.FunctionRunnerService):
             "insecureSkipTLSVerify": insecure_skip_tls_verify,
         }
 
+        jsonrpc_observe_params = {
+            "version": 1,
+            "format": "json",
+            "cmds": ["enable", "show running-config"],
+        }
+        jsonrpc_observe = request_json("runCmds", params=jsonrpc_observe_params)
+
         command_paths = walk_cmds(cmds)
         log.info("Generated command paths", count=len(command_paths))
 
         for path in command_paths:
             name = name_prefix + "-" + name_from_path(path)
 
-            jsonrpc_params = {
+            jsonrpc_create_params = {
                 "version": 1,
                 "format": "json",
                 "cmds": ["enable", "configure", *path],
             }
-            jsonrpc = request_json("runCmds", params=jsonrpc_params)
+            jsonrpc_create = request_json("runCmds", params=jsonrpc_create_params)
 
-            resource_data = construct_resource_request(jsonrpc, jsonrpc_cfg)
+            remove_path = [*path[:-1], f"no {path[-1]}"]
+            jsonrpc_remove_params = {
+                "version": 1,
+                "format": "json",
+                "cmds": ["enable", "configure", *remove_path],
+            }
+            jsonrpc_remove = request_json("runCmds", params=jsonrpc_remove_params)
+
+            expected_logic, removed_logic = create_jq_logic_expressions(path)
+
+            jsonrpc_ops = {
+                "create": jsonrpc_create,
+                "observe": jsonrpc_observe,
+                "remove": jsonrpc_remove,
+                "expectedResponseCheck": expected_logic,
+                "isRemovedCheck": removed_logic,
+            }
+
+            resource_data = construct_resource_request(jsonrpc_ops, jsonrpc_cfg)
 
             resource.update(
                 rsp.desired.resources[name],
@@ -67,6 +92,17 @@ class FunctionRunner(grpcv1.FunctionRunnerService):
             )
 
         return rsp
+
+
+def create_jq_logic_expressions(path: list[str]) -> tuple[str, str]:
+    """Create jq logic exp for Request."""
+    logic = ".response.body.error == null and ("
+    for cmd in path[:-1]:
+        logic = logic + f'.response.body.result[1].cmds."{cmd}".cmds'
+    logic1 = logic + f' | has("{path[-1]}")' + ")"
+    logic2 = logic + f' | has("{path[-1]}")' + " | not)"
+
+    return logic1, logic2
 
 
 def walk_cmds(cmds: dict, path: list[str] | None = None) -> list[list[str]]:
@@ -110,7 +146,7 @@ def get_envs(environment: dict) -> tuple[int, str, bool]:
     return port, scheme, insecure_skip_tls_verify
 
 
-def construct_resource_request(jsonrpc: str, config: dict) -> dict:
+def construct_resource_request(ops: dict, config: dict) -> dict:
     """Construct the resource request for the given data."""
     return {
         "apiVersion": "http.crossplane.io/v1alpha2",
@@ -124,7 +160,41 @@ def construct_resource_request(jsonrpc: str, config: dict) -> dict:
                 },
                 "payload": {
                     "baseUrl": f"{config['scheme']}://{config['endpoint']}:{config['port']}",
-                    "body": jsonrpc,
+                    "body": ops["create"],
+                },
+                "mappings": [
+                    {
+                        "action": "CREATE",
+                        "method": "POST",
+                        "url": ".payload.baseUrl",
+                        "body": ".payload.body",
+                    },
+                    {
+                        "action": "UPDATE",
+                        "method": "POST",
+                        "url": ".payload.baseUrl",
+                        "body": ".payload.body",
+                    },
+                    {
+                        "action": "OBSERVE",
+                        "method": "POST",
+                        "url": ".payload.baseUrl",
+                        "body": ops["observe"],
+                    },
+                    {
+                        "action": "REMOVE",
+                        "method": "POST",
+                        "url": ".payload.baseUrl",
+                        "body": ops["remove"],
+                    },
+                ],
+                "expectedResponseCheck": {
+                    "type": "CUSTOM",
+                    "logic": ops["expectedResponseCheck"],
+                },
+                "isRemovedCheck": {
+                    "type": "CUSTOM",
+                    "logic": ops["isRemovedCheck"],
                 },
             },
         },
