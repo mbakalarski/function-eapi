@@ -1,16 +1,16 @@
 name: CI
 
-on:
-  push:
-    branches:
-      - main
-      - release-*
-  pull_request: {}
-  workflow_dispatch:
-    inputs:
-      version:
-        description: Package version (e.g. v0.1.0)
-        required: false
+# on:
+#   push:
+#     branches:
+#       - main
+#       - release-*
+#   pull_request: {}
+#   workflow_dispatch:
+#     inputs:
+#       version:
+#         description: Package version (e.g. v0.1.0)
+#         required: false
 
 env:
   # Common versions
