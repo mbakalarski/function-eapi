@@ -1,9 +1,12 @@
 """A Crossplane composition function."""
 
+import hashlib
+
 import grpc
-from crossplane.function import logging, resource, response
+from crossplane.function import logging, request, resource, response
 from crossplane.function.proto.v1 import run_function_pb2 as fnv1
 from crossplane.function.proto.v1 import run_function_pb2_grpc as grpcv1
+from jsonrpcclient import request_json
 
 
 class FunctionRunner(grpcv1.FunctionRunnerService):
@@ -27,37 +30,55 @@ class FunctionRunner(grpcv1.FunctionRunnerService):
         endpoint = composite["spec"]["endpoint"]
         cmds = composite["spec"]["cmds"]
 
+        environment = resource.struct_to_dict(
+            req.context["apiextensions.crossplane.io/environment"]
+        )
+        port, scheme, insecure_skip_tls_verify = get_envs(environment)
+
+        secret = request.get_required_resource(req, "eos-creds")
+        basic_auth = secret.get("data", {}).get("basicAuth", "") if secret else ""
+
+        jsonrpc_cfg = {
+            "endpoint": endpoint,
+            "port": port,
+            "scheme": scheme,
+            "basicAuth": basic_auth,
+            "insecureSkipTLSVerify": insecure_skip_tls_verify,
+        }
+
         command_paths = walk_cmds(cmds)
         log.info("Generated command paths", count=len(command_paths))
 
         for path in command_paths:
             name = name_prefix + "-" + name_from_path(path)
 
+            jsonrpc_params = {
+                "version": 1,
+                "format": "json",
+                "cmds": ["enable", "configure", *path],
+            }
+            jsonrpc = request_json("runCmds", params=jsonrpc_params)
+
+            resource_data = construct_resource_request(jsonrpc, jsonrpc_cfg)
+
             resource.update(
                 rsp.desired.resources[name],
-                {
-                    "apiVersion": "http.crossplane.io/v1alpha2",
-                    "kind": "Request",
-                    "spec": {
-                        "endpoint": endpoint,
-                        "command": path,
-                    },
-                },
+                resource_data,
             )
 
         return rsp
 
 
 def walk_cmds(cmds: dict, path: list[str] | None = None) -> list[list[str]]:
+    """walk_cmds function."""
     if path is None:
         path = []
 
     results: list[list[str]] = []
 
-    # NOTE: keys are sorted to ensure deterministic reconciliation
     for cmd in sorted(cmds.keys()):
         subtree = cmds[cmd]
-        next_path = path + [cmd]
+        next_path = [*path, cmd]
 
         if subtree == {}:
             # Leaf → emit array
@@ -69,8 +90,42 @@ def walk_cmds(cmds: dict, path: list[str] | None = None) -> list[list[str]]:
     return results
 
 
-import hashlib
-
 def name_from_path(path: list[str]) -> str:
+    """name_from_path function."""
     joined = "|".join(path)
-    return hashlib.sha1(joined.encode()).hexdigest()[:10]
+    return hashlib.sha1(joined.encode(), usedforsecurity=False).hexdigest()[:10]
+
+
+def get_envs(environment: dict) -> tuple[int, str, bool]:
+    """Extract jsonrpc configuration from the environment."""
+    if not environment:
+        return 0, "", True
+
+    protocols_settings = environment.get("jsonrpc", {})
+
+    port = int(protocols_settings.get("port", 0))
+    scheme = protocols_settings.get("scheme", "")
+    insecure_skip_tls_verify = bool(protocols_settings.get("skipTlsVerify", True))
+
+    return port, scheme, insecure_skip_tls_verify
+
+
+def construct_resource_request(jsonrpc: str, config: dict) -> dict:
+    """Construct the resource request for the given data."""
+    return {
+        "apiVersion": "http.crossplane.io/v1alpha2",
+        "kind": "Request",
+        "spec": {
+            "forProvider": {
+                "insecureSkipTLSVerify": config["insecureSkipTLSVerify"],
+                "headers": {
+                    "Accept": ["application/json"],
+                    "Authorization": [f"Basic {config['basicAuth']}"],
+                },
+                "payload": {
+                    "baseUrl": f"{config['scheme']}://{config['endpoint']}:{config['port']}",
+                    "body": jsonrpc,
+                },
+            },
+        },
+    }

@@ -8,6 +8,25 @@ spec:
     kind: EosCommand
   mode: Pipeline
   pipeline:
-  - step: create-requests
+  - step: environmentConfigs
+    functionRef:
+      name: crossplane-contrib-function-environment-configs
+    input:
+      apiVersion: environmentconfigs.fn.crossplane.io/v1beta1
+      kind: Input
+      spec:
+        environmentConfigs:
+        - type: Reference
+          ref:
+            name: endpoint-protocols
+
+  - step: requests
     functionRef:
       name: function-eapi
+    requirements:
+      requiredResources:
+        - apiVersion: v1
+          kind: Secret
+          name: eos-creds
+          namespace: crossplane-system
+          requirementName: eos-creds

@@ -6,6 +6,13 @@ metadata:
   annotations:
     # This tells crossplane beta render to connect to the function locally.
     render.crossplane.io/runtime: Development
+# spec:
+#   # This is ignored when using the Development runtime.
+#   package: function-
+---
+apiVersion: pkg.crossplane.io/v1
+kind: Function
+metadata:
+  name: crossplane-contrib-function-environment-configs
 spec:
-  # This is ignored when using the Development runtime.
-  package: function-
+  package: xpkg.upbound.io/crossplane-contrib/function-environment-configs:v0.4.0

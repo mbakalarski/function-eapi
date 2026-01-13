@@ -1,0 +1,11 @@
+apiVersion: apiextensions.crossplane.io/v1beta1
+kind: EnvironmentConfig
+metadata:
+  name: endpoint-protocols
+data:
+  restconf:
+    scheme: https
+    port: 6020
+  jsonrpc:
+    scheme: http
+    port: 6021

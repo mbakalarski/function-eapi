@@ -5,21 +5,27 @@ with these example manifests.
 
 ```shell
 # Run the function locally
-$ hatch run development
+hatch run development
 ```
 
 ```shell
 # Then, in another terminal, call it with these example manifests
-$ crossplane beta render xr.yaml composition.yaml functions.yaml -r
+crossplane render xr.yaml composition.yaml functions.yaml \
+  --required-resources secret.yaml --extra-resources environment.yaml -r
+```
+
+```
 ---
-apiVersion: example.crossplane.io/v1
-kind: XR
+apiVersion: eos.netclab.dev/v1alpha1
+kind: EosCommand
 metadata:
-  name: example-xr
+  name: eoscommand-1
+spec:
+  endpoint: ceos01.default.svc.cluster.local
+  cmds:
+    ip prefix-list PL-Loopback0:
+      seq 10 permit 10.0.0.1/32 eq 32: {}
+      seq 20 permit 10.0.0.2/32 eq 32: {}
 ---
-apiVersion: render.crossplane.io/v1beta1
-kind: Result
-message: I was run with input "Hello world"!
-severity: SEVERITY_NORMAL
-step: run-the-template
+<...>
 ```
