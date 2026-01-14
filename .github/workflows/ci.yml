@@ -72,7 +72,6 @@ jobs:
         uses: docker/setup-buildx-action@v3
         with:
           version: ${{ env.DOCKER_BUILDX_VERSION }}
-          install: true
           driver: docker-container
 
       - name: Build runtime image
@@ -107,6 +106,31 @@ jobs:
             runtime-${{ matrix.arch }}.tar
             *.xpkg
           retention-days: 1
+
+  dry-run-pr:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    needs:
+      - build
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v7
+        with:
+          path: .
+          merge-multiple: true
+
+      - name: Install Crossplane CLI
+        run: curl -sL "https://raw.githubusercontent.com/crossplane/crossplane/main/install.sh" | sh
+
+      - name: Print Crossplane client version
+        run: ./crossplane version --client
+
+      - name: List built artifacts
+        run: |
+          echo "Artifacts built for PR:"
+          ls -lh *.xpkg runtime-*.tar || echo "No artifacts found"
 
   push:
     runs-on: ubuntu-24.04
