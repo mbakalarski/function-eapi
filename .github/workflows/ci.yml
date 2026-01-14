@@ -62,6 +62,18 @@ jobs:
         run: |
           echo "XPKG_VERSION=v$(python -c 'from function.__version__ import __version__; print(__version__)')" >> $GITHUB_ENV
 
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: all
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          version: ${{ env.DOCKER_BUILDX_VERSION }}
+          install: true
+          driver: docker-container   # <-- required for caching
+
       - name: Build runtime image
         uses: docker/build-push-action@v6
         with:
