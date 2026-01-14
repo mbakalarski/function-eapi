@@ -9,7 +9,9 @@ readme = "README.md"
 requires-python = ">=3.11,<3.12"
 license = "Apache-2.0"
 keywords = []
-authors = [{ name = "Michal Bakalarski" }]
+authors = [
+  { name = "Michal Bakalarski", email = "64490638+mbakalarski@users.noreply.github.com" }
+]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Programming Language :: Python",
