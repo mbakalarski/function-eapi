@@ -1,6 +1,6 @@
 # Example manifests
 
-You can run your function locally and test it using `crossplane beta render`
+You can run your function locally and test it using `crossplane render`
 with these example manifests.
 
 ```shell

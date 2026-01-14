@@ -9,7 +9,7 @@ readme = "README.md"
 requires-python = ">=3.11,<3.12"
 license = "Apache-2.0"
 keywords = []
-authors = [{ name = "Netclab Contributors" }]
+authors = [{ name = "Michal Bakalarski" }]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Programming Language :: Python",

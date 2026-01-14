@@ -1,78 +1,150 @@
-import dataclasses
+import json
 import unittest
 
 from crossplane.function import logging, resource
 from crossplane.function.proto.v1 import run_function_pb2 as fnv1
-from google.protobuf import duration_pb2 as durationpb
-from google.protobuf import json_format
 from google.protobuf import struct_pb2 as structpb
+from google.protobuf.json_format import MessageToDict
 
 from function import fn
 
 
 class TestFunctionRunner(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
-        # Allow larger diffs, since we diff large strings of JSON.
-        self.maxDiff = 2000
-
         logging.configure(level=logging.Level.DISABLED)
 
-    async def test_run_function(self) -> None:
-        @dataclasses.dataclass
-        class TestCase:
-            reason: str
-            req: fnv1.RunFunctionRequest
-            want: fnv1.RunFunctionResponse
+    async def test_run_function_generates_request(self) -> None:
+        """Generates a valid HTTP Request from an EosCommand."""
 
-        cases = [
-            TestCase(
-                reason="The function should return the input as a result.",
-                req=fnv1.RunFunctionRequest(
-                    input=resource.dict_to_struct({"version": "v1beta2"}),
-                    observed=fnv1.State(
-                        composite=fnv1.Resource(
-                            resource=resource.dict_to_struct(
-                                {
-                                    "apiVersion": "example.crossplane.io/v1",
-                                    "kind": "XR",
-                                    "spec": {"region": "us-west-2"},
-                                }
-                            ),
-                        ),
-                    ),
-                ),
-                want=fnv1.RunFunctionResponse(
-                    meta=fnv1.ResponseMeta(ttl=durationpb.Duration(seconds=60)),
-                    desired=fnv1.State(
-                        resources={
-                            "bucket": fnv1.Resource(
-                                resource=resource.dict_to_struct(
-                                    {
-                                        "apiVersion": "s3.aws.upbound.io/v1beta2",
-                                        "kind": "Bucket",
-                                        "spec": {
-                                            "forProvider": {"region": "us-west-2"},
-                                        },
-                                    }
-                                ),
-                            ),
-                        },
-                    ),
-                    context=structpb.Struct(),
-                ),
+        # ----------------------------
+        # Inputs
+        # ----------------------------
+
+        composite = {
+            "apiVersion": "eos.netclab.dev/v1alpha1",
+            "kind": "EosCommand",
+            "metadata": {"name": "eoscommand-1"},
+            "spec": {
+                "endpoint": "ceos01.default.svc.cluster.local",
+                "cmds": {
+                    "ip prefix-list PL-Loopback0": {
+                        "seq 10 permit 10.0.0.1/32 eq 32": {}
+                    }
+                },
+            },
+        }
+
+        secret = {
+            "apiVersion": "v1",
+            "kind": "Secret",
+            "metadata": {
+                "name": "eos-creds",
+                "namespace": "crossplane-system",
+            },
+            "type": "Opaque",
+            "data": {
+                "basicAuth": "YXJpc3RhOmFyaXN0YQ==",
+            },
+        }
+
+        environment = {
+            "restconf": {"scheme": "https", "port": 6020},
+            "jsonrpc": {"scheme": "http", "port": 6021},
+        }
+
+        context = structpb.Struct(
+            fields={
+                "apiextensions.crossplane.io/environment": structpb.Value(
+                    struct_value=resource.dict_to_struct(environment)
+                )
+            }
+        )
+
+        req = fnv1.RunFunctionRequest(
+            input=resource.dict_to_struct({"version": "v1beta2"}),
+            observed=fnv1.State(
+                composite=fnv1.Resource(resource=resource.dict_to_struct(composite))
             ),
-        ]
+            required_resources={
+                "eos-creds": fnv1.Resources(
+                    items=[fnv1.Resource(resource=resource.dict_to_struct(secret))]
+                )
+            },
+            context=context,
+        )
+
+        # ----------------------------
+        # Run function
+        # ----------------------------
 
         runner = fn.FunctionRunner()
+        resp = await runner.RunFunction(req, None)
 
-        for case in cases:
-            got = await runner.RunFunction(case.req, None)
-            self.assertEqual(
-                json_format.MessageToDict(case.want),
-                json_format.MessageToDict(got),
-                "-want, +got",
-            )
+        # ----------------------------
+        # Resource existence
+        # ----------------------------
 
+        self.assertIn(
+            "eoscommand-1-b1ed383535",
+            resp.desired.resources,
+            "Expected Request resource not found",
+        )
 
-if __name__ == "__main__":
-    unittest.main()
+        resource_msg = resp.desired.resources["eoscommand-1-b1ed383535"].resource
+
+        result = MessageToDict(resource_msg)
+
+        # ----------------------------
+        # Top-level assertions
+        # ----------------------------
+
+        self.assertEqual(result["kind"], "Request")
+        self.assertEqual(result["apiVersion"], "http.crossplane.io/v1alpha2")
+
+        # ----------------------------
+        # Metadata (optional fields)
+        # ----------------------------
+
+        metadata = result.get("metadata", {})
+
+        # Metadata may be empty
+        self.assertIsInstance(metadata, dict)
+
+        # ----------------------------
+        # Spec assertions
+        # ----------------------------
+
+        spec = result["spec"]["forProvider"]
+
+        # Headers
+        headers = spec["headers"]
+        self.assertEqual(
+            headers["Authorization"][0],
+            "Basic YXJpc3RhOmFyaXN0YQ==",
+        )
+        self.assertIn("application/json", headers["Accept"])
+
+        # Base URL from environment
+        payload = spec["payload"]
+        self.assertEqual(
+            payload["baseUrl"],
+            "http://ceos01.default.svc.cluster.local:6021",
+        )
+
+        # JSON-RPC payload
+        body = json.loads(payload["body"])
+        self.assertEqual(body["method"], "runCmds")
+        self.assertIn(
+            "ip prefix-list PL-Loopback0",
+            " ".join(body["params"]["cmds"]),
+        )
+
+        # ----------------------------
+        # Mappings
+        # ----------------------------
+
+        actions = {m["action"] for m in spec["mappings"]}
+        self.assertSetEqual(
+            actions,
+            {"CREATE", "UPDATE", "OBSERVE", "REMOVE"},
+        )

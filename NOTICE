@@ -1,0 +1,9 @@
+function-eapi
+
+Copyright 2025–present Michal Bakalarski and Netclab Contributors
+
+This product includes software derived from
+Crossplane function-template-python
+https://github.com/crossplane/function-template-python
+
+Licensed under the Apache License, Version 2.0.

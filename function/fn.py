@@ -1,12 +1,15 @@
 """A Crossplane composition function."""
 
 import hashlib
+import json
 
 import grpc
 from crossplane.function import logging, request, resource, response
 from crossplane.function.proto.v1 import run_function_pb2 as fnv1
 from crossplane.function.proto.v1 import run_function_pb2_grpc as grpcv1
 from jsonrpcclient import request_json
+
+JSONRPC_BASE = {"version": 1, "format": "json"}
 
 
 class FunctionRunner(grpcv1.FunctionRunnerService):
@@ -47,29 +50,29 @@ class FunctionRunner(grpcv1.FunctionRunnerService):
         }
 
         jsonrpc_observe_params = {
-            "version": 1,
-            "format": "json",
+            **JSONRPC_BASE,
             "cmds": ["enable", "show running-config"],
         }
         jsonrpc_observe = request_json("runCmds", params=jsonrpc_observe_params)
 
-        command_paths = walk_cmds(cmds)
+        command_paths = sorted(walk_cmds(cmds))
         log.info("Generated command paths", count=len(command_paths))
 
         for path in command_paths:
             name = name_prefix + "-" + name_from_path(path)
 
+            path_log = log.bind(resource=name, path=" | ".join(path))
+            path_log.debug("Creating resource")
+
             jsonrpc_create_params = {
-                "version": 1,
-                "format": "json",
+                **JSONRPC_BASE,
                 "cmds": ["enable", "configure", *path],
             }
             jsonrpc_create = request_json("runCmds", params=jsonrpc_create_params)
 
             remove_path = [*path[:-1], f"no {path[-1]}"]
             jsonrpc_remove_params = {
-                "version": 1,
-                "format": "json",
+                **JSONRPC_BASE,
                 "cmds": ["enable", "configure", *remove_path],
             }
             jsonrpc_remove = request_json("runCmds", params=jsonrpc_remove_params)
@@ -94,19 +97,25 @@ class FunctionRunner(grpcv1.FunctionRunnerService):
         return rsp
 
 
-def create_jq_logic_expressions(path: list[str]) -> tuple[str, str]:
-    """Create jq logic exp for Request."""
-    logic = ".response.body.error == null and ("
-    for cmd in path[:-1]:
-        logic = logic + f'.response.body.result[1].cmds."{cmd}".cmds'
-    logic1 = logic + f' | has("{path[-1]}")' + ")"
-    logic2 = logic + f' | has("{path[-1]}")' + " | not)"
+def jq_path(cmds: list[str]) -> str:
+    """Create middle part of jq logic expression."""
+    return "".join([f".cmds[{json.dumps(c)}]" for c in cmds])
 
-    return logic1, logic2
+
+def create_jq_logic_expressions(path: list[str]) -> tuple[str, str]:
+    """Compose jq logic expressions."""
+    base = ".response.body"
+    tree = f"{base}.result[1]{jq_path(path[:-1])}.cmds"
+    check = f"has({json.dumps(path[-1])})"
+
+    expected = f"{base}.error == null and ({tree} | {check})"
+    removed = f"{base}.error == null and ({tree} | {check} | not)"
+
+    return expected, removed
 
 
 def walk_cmds(cmds: dict, path: list[str] | None = None) -> list[list[str]]:
-    """walk_cmds function."""
+    """Make command paths from nested command tree."""
     if path is None:
         path = []
 
