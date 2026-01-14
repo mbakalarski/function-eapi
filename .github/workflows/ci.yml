@@ -5,6 +5,8 @@ on:
     branches:
       - main
       - release-*
+    tags:
+      - "v*"
   pull_request: {}
   workflow_dispatch: {}
 
@@ -12,7 +14,6 @@ env:
   PYTHON_VERSION: "3.11"
   HATCH_VERSION: "1.16.2"
   DOCKER_BUILDX_VERSION: "v0.30.1"
-
   XP_CHANNEL: stable
   XPKG: xpkg.crossplane.io/${{ github.repository }}
 
@@ -72,7 +73,7 @@ jobs:
         with:
           version: ${{ env.DOCKER_BUILDX_VERSION }}
           install: true
-          driver: docker-container   # <-- required for caching
+          driver: docker-container
 
       - name: Build runtime image
         uses: docker/build-push-action@v6
@@ -88,8 +89,8 @@ jobs:
       - name: Install Crossplane CLI
         run: curl -sL "https://raw.githubusercontent.com/crossplane/crossplane/main/install.sh" | sh
 
-      - name: Print Crossplane version
-        run: ./crossplane version
+      - name: Print Crossplane client version
+        run: ./crossplane version --client
 
       - name: Build xpkg
         run: |
@@ -98,7 +99,7 @@ jobs:
             --package-file=${{ matrix.arch }}.xpkg \
             --embed-runtime-image-tarball=runtime-${{ matrix.arch }}.tar
 
-      - name: Upload combined artifact
+      - name: Upload artifact
         uses: actions/upload-artifact@v6
         with:
           name: artifact-${{ matrix.arch }}
@@ -124,8 +125,8 @@ jobs:
       - name: Install Crossplane CLI
         run: curl -sL "https://raw.githubusercontent.com/crossplane/crossplane/main/install.sh" | sh
 
-      - name: Print Crossplane version
-        run: ./crossplane version
+      - name: Print Crossplane client version
+        run: ./crossplane version --client
 
       - name: Read version from Python package
         id: read_version
