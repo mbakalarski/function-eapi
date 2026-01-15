@@ -41,6 +41,7 @@ jobs:
       - name: Run unit tests
         run: hatch test --all --randomize
 
+
   # We want to build most packages for the amd64 and arm64 architectures. To
   # speed this up we build single-platform packages in parallel. We then upload
   # those packages to GitHub as a build artifact. The push job downloads those
@@ -66,7 +67,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
         with:
           version: ${{ env.DOCKER_BUILDX_VERSION }}
-          install: true
+          # install: true
 
       - name: Checkout
         uses: actions/checkout@v6
@@ -118,7 +119,6 @@ jobs:
       - name: Download Single-Platform Packages
         uses: actions/download-artifact@v7
         with:
-          # See https://github.com/docker/build-push-action/blob/263435/README.md#summaries
           pattern: "!*.dockerbuild"
           path: .
           merge-multiple: true
@@ -135,7 +135,6 @@ jobs:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
 
       - name: Read version from Python package
         id: read_version
