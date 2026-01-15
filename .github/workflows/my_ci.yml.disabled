@@ -2,20 +2,20 @@ name: CI
 
 on:
   push:
-    branches:
-      - main
-      - release-*
+    # branches:
+    #   - main
+    #   - release-*
     tags:
       - "v*"
-  pull_request: {}
-  workflow_dispatch: {}
+  # pull_request: {}
+  # workflow_dispatch: {}
 
 env:
   PYTHON_VERSION: "3.11"
   HATCH_VERSION: "1.16.2"
   DOCKER_BUILDX_VERSION: "v0.30.1"
   XP_CHANNEL: stable
-  XPKG: xpkg.crossplane.io/${{ github.repository }}
+  XPKG: ghcr.io/${{ github.repository}}
 
 jobs:
   lint:
