@@ -45,7 +45,7 @@ class FunctionRunner(grpcv1.FunctionRunnerService):
 
         composite = req.observed.composite.resource
         name_prefix = composite["metadata"]["name"]
-        endpoint = composite["spec"]["endpoint"]
+        fqdn = composite["spec"]["endpoint"]
         cmds = composite["spec"]["cmds"]
 
         environment = resource.struct_to_dict(
@@ -57,11 +57,12 @@ class FunctionRunner(grpcv1.FunctionRunnerService):
         basic_auth = secret.get("data", {}).get("basicAuth", "") if secret else ""
 
         jsonrpc_cfg = {
-            "endpoint": endpoint,
+            "fqdn": fqdn,
             "port": port,
             "scheme": scheme,
             "basicAuth": basic_auth,
             "insecureSkipTLSVerify": insecure_skip_tls_verify,
+            "basePath": "/command-api",
         }
 
         jsonrpc_observe_params = {
@@ -183,7 +184,7 @@ def construct_resource_request(ops: dict, config: dict) -> dict:
                     "Authorization": [f"Basic {config['basicAuth']}"],
                 },
                 "payload": {
-                    "baseUrl": f"{config['scheme']}://{config['endpoint']}:{config['port']}",
+                    "baseUrl": f"{config['scheme']}://{config['fqdn']}:{config['port']}{config['basePath']}",
                     "body": ops["create"],
                 },
                 "mappings": [

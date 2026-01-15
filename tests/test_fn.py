@@ -143,7 +143,7 @@ class TestFunctionRunner(unittest.IsolatedAsyncioTestCase):
         payload = spec["payload"]
         self.assertEqual(
             payload["baseUrl"],
-            "http://ceos01.default.svc.cluster.local:6021",
+            "http://ceos01.default.svc.cluster.local:6021/command-api",
         )
 
         # JSON-RPC payload
