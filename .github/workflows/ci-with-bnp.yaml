@@ -15,6 +15,7 @@ env:
   DOCKER_BUILDX_VERSION: "v0.30.1"
   XP_CHANNEL: stable
   XPKG: ghcr.io/${{ github.repository }}
+  UP_XPKG: xpkg.upbound.io/netclab/function-eapi
 
 jobs:
   lint:
@@ -168,4 +169,4 @@ jobs:
         run: ./up login --token ${{ secrets.UPBOUND_TOKEN }}
 
       - name: Push Multi-Platform Package to Upbound registry
-        run: ./up xpkg push -f $(echo *.xpkg|tr ' ' ,) ${{ env.XPKG }}:${{ env.XPKG_VERSION }}
+        run: ./up xpkg push -f $(echo *.xpkg|tr ' ' ,) ${{ env.UP_XPKG }}:${{ env.XPKG_VERSION }}
