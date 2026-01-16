@@ -156,3 +156,16 @@ jobs:
 
       - name: Push Multi-Platform Package to GitHub Container Registry
         run: "./crossplane --verbose xpkg push --package-files $(echo *.xpkg|tr ' ' ,) ${{ env.XPKG }}:${{ env.XPKG_VERSION }}"
+
+      # push xpkg to Upbound
+      - name: Install Upbound CLI
+        run: curl -sL "https://cli.upbound.io" | sh
+
+      - name: Print Upbound CLI version
+        run: ./up version --client
+
+      - name: Login to Upbound Registry
+        run: up login --token ${{ secrets.UPBOUND_TOKEN }}
+
+      - name: Push Multi-Platform Package to Upbound registry
+        run: "./up xpkg push -f $(echo *.xpkg|tr ' ' ,) ${{ env.XPKG }}:${{ env.XPKG_VERSION }}"
