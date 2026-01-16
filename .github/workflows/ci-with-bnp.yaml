@@ -170,3 +170,6 @@ jobs:
 
       - name: Push Multi-Platform Package to Upbound registry
         run: ./up xpkg push -f $(echo *.xpkg|tr ' ' ,) ${{ env.UP_XPKG }}:${{ env.XPKG_VERSION }}
+
+      - name: Logout from Upbound Registry (removing session creds)
+        run: ./up logout
