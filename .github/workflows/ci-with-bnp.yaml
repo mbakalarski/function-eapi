@@ -165,7 +165,7 @@ jobs:
         run: ./up version --client
 
       - name: Login to Upbound Registry
-        run: up login --token ${{ secrets.UPBOUND_TOKEN }}
+        run: ./up login --token ${{ secrets.UPBOUND_TOKEN }}
 
       - name: Push Multi-Platform Package to Upbound registry
-        run: "./up xpkg push -f $(echo *.xpkg|tr ' ' ,) ${{ env.XPKG }}:${{ env.XPKG_VERSION }}"
+        run: ./up xpkg push -f $(echo *.xpkg|tr ' ' ,) ${{ env.XPKG }}:${{ env.XPKG_VERSION }}
