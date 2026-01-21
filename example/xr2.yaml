@@ -1,0 +1,14 @@
+apiVersion: eos.netclab.dev/v1alpha1
+kind: EosCommand
+metadata:
+  name: eoscommand-1
+spec:
+  endpoint: ceos01.default.svc.cluster.local
+  removeContainer: true
+  cmds:
+    no spanning-tree vlan-id 4093-4094: {}
+    ip prefix-list PL-Loopback0:
+      seq 10 permit 10.0.0.1/32 eq 32: {}
+      seq 20 permit 10.0.0.2/32 eq 32: {}
+    router bgp 65100:
+      no bgp default ipv4-unicast: {}
