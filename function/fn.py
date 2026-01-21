@@ -43,10 +43,12 @@ class FunctionRunner(grpcv1.FunctionRunnerService):
 
         rsp = response.to(req)
 
-        composite = req.observed.composite.resource
-        name_prefix = composite["metadata"]["name"]
-        fqdn = composite["spec"]["endpoint"]
-        cmds = composite["spec"]["cmds"]
+        composite = resource.struct_to_dict(req.observed.composite.resource)
+        name_prefix = composite.get("metadata").get("name")
+        composite_spec: dict = composite.get("spec")
+        fqdn = composite_spec.get("endpoint")
+        cmds = composite_spec.get("cmds")
+        remove_container = composite_spec.get("removeContainer")
 
         environment = resource.struct_to_dict(
             req.context["apiextensions.crossplane.io/environment"]
@@ -86,10 +88,13 @@ class FunctionRunner(grpcv1.FunctionRunnerService):
             }
             jsonrpc_create = request_json("runCmds", params=jsonrpc_create_params)
 
-            remove_path = [*path[:-1], f"no {path[-1]}"]
             jsonrpc_remove_params = {
                 **JSONRPC_BASE,
-                "cmds": ["enable", "configure", *remove_path],
+                "cmds": [
+                    "enable",
+                    "configure",
+                    *build_remove_path(path, remove_container=remove_container),
+                ],
             }
             jsonrpc_remove = request_json("runCmds", params=jsonrpc_remove_params)
 
@@ -111,6 +116,30 @@ class FunctionRunner(grpcv1.FunctionRunnerService):
             )
 
         return rsp
+
+
+def toggle_no(cmd: str) -> str:
+    """To clarify intent of build_remove_path()."""
+    return cmd.removeprefix("no ") if cmd.startswith("no ") else f"no {cmd}"
+
+
+def build_remove_path(path: list[str], *, remove_container: bool = False) -> list[str]:
+    """Create cmd for remove op."""
+    head, *tail = path
+
+    # remove the container
+    if remove_container and tail:
+        return [f"no {head}"]
+
+    # remove nested items
+    if tail:
+        return [
+            head,
+            *(toggle_no(cmd) for cmd in tail),
+        ]
+
+    # one line path
+    return [toggle_no(head)]
 
 
 def jq_path(cmds: list[str]) -> str:
@@ -142,7 +171,7 @@ def walk_cmds(cmds: dict, path: list[str] | None = None) -> list[list[str]]:
         next_path = [*path, cmd]
 
         if subtree == {}:
-            # Leaf → emit array
+            # Leaf -> emit array
             results.append(next_path)
         else:
             # Recurse
