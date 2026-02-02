@@ -123,8 +123,8 @@ def name_based_on_path(observed: str, path: list[str]) -> str:
     hashed_path = hashlib.sha256(
         joined.encode("utf-8"), usedforsecurity=False
     ).hexdigest()
-    full = f"{observed}-{hashed_path}"
-    return full[:253].rstrip("-")
+    full = f"{observed[:14]}-{hashed_path[:48]}"
+    return full.rstrip("-")[:63]
 
 
 def toggle_no(cmd: str) -> str:
