@@ -1,7 +1,7 @@
-apiVersion: eos.netclab.dev/v1alpha1
-kind: EosCommand
+apiVersion: netclab.dev/v1alpha1
+kind: CliConfig
 metadata:
-  name: eoscommand-2
+  name: eoscommand-1
 spec:
   endpoint: ceos01.default.svc.cluster.local
   removeContainer: false

@@ -43,12 +43,11 @@ class FunctionRunner(grpcv1.FunctionRunnerService):
 
         rsp = response.to(req)
 
-        composite = resource.struct_to_dict(req.observed.composite.resource)
-        name_prefix = composite.get("metadata").get("name")
-        composite_spec: dict = composite.get("spec")
-        fqdn = composite_spec.get("endpoint")
-        cmds = composite_spec.get("cmds")
-        remove_container = composite_spec.get("removeContainer")
+        observed_xr = resource.struct_to_dict(req.observed.composite.resource)
+        observed_xr_name = observed_xr.get("metadata").get("name")
+        fqdn = observed_xr["spec"].get("endpoint")
+        cmds = observed_xr["spec"].get("cmds")
+        remove_container = observed_xr["spec"].get("removeContainer")
 
         environment = resource.struct_to_dict(
             req.context["apiextensions.crossplane.io/environment"]
@@ -77,7 +76,7 @@ class FunctionRunner(grpcv1.FunctionRunnerService):
         log.info("Generated command paths", count=len(command_paths))
 
         for path in command_paths:
-            name = name_prefix + "-" + name_from_path(path)
+            name = name_based_on_path(observed_xr_name, path)
 
             path_log = log.bind(resource=name, path=" | ".join(path))
             path_log.debug("Creating resource")
@@ -108,7 +107,7 @@ class FunctionRunner(grpcv1.FunctionRunnerService):
                 "isRemovedCheck": removed_logic,
             }
 
-            resource_data = construct_resource_request(jsonrpc_ops, jsonrpc_cfg)
+            resource_data = construct_request_resource(name, jsonrpc_ops, jsonrpc_cfg)
 
             resource.update(
                 rsp.desired.resources[name],
@@ -116,6 +115,16 @@ class FunctionRunner(grpcv1.FunctionRunnerService):
             )
 
         return rsp
+
+
+def name_based_on_path(observed: str, path: list[str]) -> str:
+    """name_based_on_path function."""
+    joined = "|".join(path)
+    hashed_path = hashlib.sha256(
+        joined.encode("utf-8"), usedforsecurity=False
+    ).hexdigest()
+    full = f"{observed}-{hashed_path}"
+    return full[:253].rstrip("-")
 
 
 def toggle_no(cmd: str) -> str:
@@ -180,12 +189,6 @@ def walk_cmds(cmds: dict, path: list[str] | None = None) -> list[list[str]]:
     return results
 
 
-def name_from_path(path: list[str]) -> str:
-    """name_from_path function."""
-    joined = "|".join(path)
-    return hashlib.sha1(joined.encode(), usedforsecurity=False).hexdigest()[:10]
-
-
 def get_envs(environment: dict) -> tuple[int, str, bool]:
     """Extract jsonrpc configuration from the environment."""
     if not environment:
@@ -200,11 +203,14 @@ def get_envs(environment: dict) -> tuple[int, str, bool]:
     return port, scheme, insecure_skip_tls_verify
 
 
-def construct_resource_request(ops: dict, config: dict) -> dict:
+def construct_request_resource(name: str, ops: dict, config: dict) -> dict:
     """Construct the resource request for the given data."""
     return {
         "apiVersion": "http.crossplane.io/v1alpha2",
         "kind": "Request",
+        "metadata": {
+            "name": name,
+        },
         "spec": {
             "forProvider": {
                 "insecureSkipTLSVerify": config["insecureSkipTLSVerify"],

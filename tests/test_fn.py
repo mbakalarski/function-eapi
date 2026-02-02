@@ -29,15 +29,15 @@ class TestFunctionRunner(unittest.IsolatedAsyncioTestCase):
         logging.configure(level=logging.Level.DISABLED)
 
     async def test_run_function_generates_request(self) -> None:
-        """Generates a valid HTTP Request from an EosCommand."""
+        """Generates a valid HTTP Request from an CliConfig."""
 
         # ----------------------------
         # Inputs
         # ----------------------------
 
         composite = {
-            "apiVersion": "eos.netclab.dev/v1alpha1",
-            "kind": "EosCommand",
+            "apiVersion": "netclab.dev/v1alpha1",
+            "kind": "CliConfig",
             "metadata": {"name": "eoscommand-1"},
             "spec": {
                 "endpoint": "ceos01.default.svc.cluster.local",
@@ -99,15 +99,21 @@ class TestFunctionRunner(unittest.IsolatedAsyncioTestCase):
         # Resource existence
         # ----------------------------
 
+        request_name = "eoscommand-1-5cc898bff667884f5d8706ea7c4543e267a567c90662a48ac7efb4964dca9015"  # noqa E501
+
+        self.assertGreater(
+            len(resp.desired.resources), 0, "No desired resources generated"
+        )
+
         self.assertIn(
-            "eoscommand-1-b1ed383535",
+            request_name,
             resp.desired.resources,
             "Expected Request resource not found",
         )
 
-        resource_msg = resp.desired.resources["eoscommand-1-b1ed383535"].resource
+        request_resource = resp.desired.resources[request_name].resource
 
-        result = MessageToDict(resource_msg)
+        result = MessageToDict(request_resource)
 
         # ----------------------------
         # Top-level assertions
