@@ -4,8 +4,8 @@ metadata:
   name: eoscommands
 spec:
   compositeTypeRef:
-    apiVersion: eos.netclab.dev/v1alpha1
-    kind: EosCommand
+    apiVersion: netclab.dev/v1alpha1
+    kind: CliConfig
   mode: Pipeline
   pipeline:
   - step: environmentConfigs

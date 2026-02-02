@@ -31,7 +31,6 @@ crossplane xpkg build -f package --embed-runtime-image=runtime
 
 ## License
 
-This project is licensed under the Apache License 2.0.
+Copyright 2026-present Michal Bakalarski and Netclab Contributors
 
-This function was originally created using the
-Crossplane function-template-python project.
+The project is published under [Apache 2.0 License](LICENSE)

@@ -10,6 +10,6 @@ hatch run development
 
 ```shell
 # Then, in another terminal, call it with these example manifests
-crossplane render xr.yaml composition.yaml functions.yaml \
+crossplane render xr1.yaml composition.yaml functions.yaml \
   --required-resources secret.yaml --extra-resources environment.yaml -r
 ```
