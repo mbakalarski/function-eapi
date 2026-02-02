@@ -99,7 +99,7 @@ class TestFunctionRunner(unittest.IsolatedAsyncioTestCase):
         # Resource existence
         # ----------------------------
 
-        request_name = "eoscommand-1-5cc898bff667884f5d8706ea7c4543e267a567c90662a48ac7efb4964dca9015"
+        request_name = "eoscommand-1-5cc898bff667884f5d8706ea7c4543e267a567c90662a48ac7efb4964dca9015"  # noqa E501
 
         self.assertGreater(
             len(resp.desired.resources), 0, "No desired resources generated"
