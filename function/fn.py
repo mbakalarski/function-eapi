@@ -117,14 +117,12 @@ class FunctionRunner(grpcv1.FunctionRunnerService):
         return rsp
 
 
-def name_based_on_path(observed: str, path: list[str]) -> str:
+def name_based_on_path(observed_xr_name: str, path: list[str]) -> str:
     """name_based_on_path function."""
-    joined = "|".join(path)
-    hashed_path = hashlib.sha256(
-        joined.encode("utf-8"), usedforsecurity=False
-    ).hexdigest()
-    full = f"{observed[:14]}-{hashed_path[:48]}"
-    return full.rstrip("-")[:63]
+    prefix = f"{observed_xr_name[:15]}".rstrip("-")
+    _joint = "".join(path)
+    suffix = hashlib.sha256(_joint.encode("utf-8"), usedforsecurity=False).hexdigest()
+    return f"{prefix}-{suffix}".strip()[:63]
 
 
 def toggle_no(cmd: str) -> str:
